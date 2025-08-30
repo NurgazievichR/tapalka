@@ -1,22 +1,23 @@
-# apps/users/views.py
-from django.contrib.auth import get_user_model
-from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
+from drf_spectacular.utils import extend_schema, OpenApiResponse
 
 from .serializers import AuthInitDataSerializer
 from .service import verify_init_data
+from .models import User
 
-User = get_user_model()
 
-class TelegramAuthView(APIView):
+class TelegramAuthView(GenericAPIView):
+    serializer_class = AuthInitDataSerializer  
+
     def post(self, request):
-        init_data = AuthInitDataSerializer(data=request.data)
-        init_data.is_valid(raise_exception=True)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         try:
-            parsed = verify_init_data(init_data.validated_data["init_data"])
+            parsed = verify_init_data(serializer.validated_data["init_data"])
         except ValueError as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -35,7 +36,7 @@ class TelegramAuthView(APIView):
         )
 
         refresh = RefreshToken.for_user(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {"access": str(refresh.access_token), "refresh": str(refresh)},
+            status=status.HTTP_200_OK,
+        )
